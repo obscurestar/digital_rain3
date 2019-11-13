@@ -110,24 +110,31 @@ byte Rain::walkPixels()
            * so we use the extra space of the signed integer to absorb this, then range check
            * and only adopt valid range values. 
            */
-          signed int val = CONFIG::pix[p].c[c] + (random(3) - 1); // rand result set [0,1,2] - 1 = [-1, 0, 1]
+          signed int val = CONFIG::pix.get(p).c[c] + (random(3) - 1); // rand result set [0,1,2] - 1 = [-1, 0, 1]
           if (val > 0 && val < 255)
           {
-            CONFIG::pix[p].c[c] = val;  //Stagger around in the relative color space.
+            CONFIG::pix.set(p,c,val);  //Stagger around in the relative color space.
           }
       }
       else
       {                       //Stagger towards 0, let iterator know this one doesn't count. 
-        if (CONFIG::pix[p].c[c] > 0) //This RGB should not be set in this hue. Still draining previous color
+        if (CONFIG::pix.get(p).c[c] > 0) //This RGB should not be set in this hue. Still draining previous color
         {
           mDirty=true;  //Indicates some pixels of the skipped hue are still set. 
-          /*Initially I had simpley pix[p].c[c] -= random(2); (50/50 chance of darkening) 
+          /*Initially I had simply pix.get(p).c[c] -= random(2); (50/50 chance of darkening) 
            * but decided this moved to 0 too quickly and played around to find a chance 
            * to descend that was more visually appealing to me. 
            */
           if (!random(6))
           {
-            CONFIG::pix[p].c[c] --; //Wander slowly towards 0.
+            /*TODO: This is a bit uglier than our previous interface of 
+             * simply -- Let's leave this for the moment.  If we find later
+             * that we're doing a lot of math directly on elements, we might
+             * consider writing some operator overloads to handle this.
+             */
+            COLOR col = CONFIG::pix.get(p); //Get value
+            col.c[c] --;                    //Subtract
+            CONFIG::pix.set(p, col);        //Write
           }
         }
       }

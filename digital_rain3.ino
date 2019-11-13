@@ -58,7 +58,7 @@ void display_pix()
   for (int i=0;i<CONFIG::NUM_LEDS;++i)
   {
     COLOR c;
-    c.l = CONFIG::pix[i].l;
+    c = CONFIG::pix.get(i);
     H_LEDS.setPixelColor( ( (CONFIG::NUM_LEDS - i) - 1), H_LEDS.Color(c.c[0], c.c[1], c.c[2]));
   }
   H_LEDS.show();

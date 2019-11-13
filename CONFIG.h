@@ -24,28 +24,42 @@
  * and one step closer to safe refactoring should we ever decide it
  * is not as universal a concept as I had previously believed.
  */
+
+ /*At last, a good use for a #define!  Let's define USE_SPI_MEM if we want to 
+  * store requests in arduino's 2K our SPI's 32K.
+  * I do not know if arduino cross compile is capable of weeding out
+  * uncalled functions. I might investigate this later but right now I
+  * want to use one set of calls to provide the same interfaces to the 
+  * rest of my code.  #defines are pre-processor directives and code
+  * I put in those blocks is certain to not take up precious resources.
+  * The define is here in config to make sure it populates everywhere.
+  * Note you'll more often see #define foo <expr>  than just a bare #define
+  * like this.  
+  */
+
+  //Uncomment the following line to use SPI memory for pix array.
+ #define USE_SPI_MEM //Comment out this line to use Arduino memory for pix array.
+
 #include "color.h"  //Our color datatype.
+#include "pixelarray.h" 
 namespace CONFIG 
 {
   //Hardware constants
+  /*SPI RAM Also uses the pins 11, 12, and 13 on the arduino*/
+  const short PIN_SPIRAM = 10;  //The data pin for talking to extended memory module.
   const short PIN_LED = 6;  //Pin connecting the IN on the LED strip to the CPU board.
   const short NUM_LEDS = 16; //Num LEDS in our array.
 
   //Global Variables
   byte MAX_BRITE=255;  //The brightest we want our display to get. 
 
-  /*pix is 4 bytes per LED. Remember our 328 CPU only has 2K of active memory.
-   * if you have 512 pix, that's all of the memory including the memory for calling functions
-   * making computations, talking to our libraries, etc. 
-   * We will address this in a later version by using a 32K expansion chip on the IC2 bus.
-   */
-  COLOR pix[NUM_LEDS]; //Array of data for our pixels.  See above!
-
+ 
+  PixelArray pix(NUM_LEDS, 0); //Either pointer to buffer  or offset for spiram.
 };
 
 #else  //CONFIG_H 
 
-extern const short NUM_LEDS; //Let's address this in V3!
-extern COLOR pix[];  //Ditto!
+extern const short NUM_LEDS; 
+//extern PixelArray pix;  //Ditto!
 
 #endif //CONFIG_H
