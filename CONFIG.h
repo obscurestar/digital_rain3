@@ -54,7 +54,7 @@ namespace CONFIG
   byte MAX_BRITE=255;  //The brightest we want our display to get. 
 
  
-  PixelArray pix(NUM_LEDS, 0); //Either pointer to buffer  or offset for spiram.
+  PixelArray pix(NUM_LEDS, 1); //Either pointer to buffer  or offset for spiram.
 };
 
 #else  //CONFIG_H 

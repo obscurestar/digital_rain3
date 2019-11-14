@@ -100,12 +100,12 @@ void PixelArray::set(int id, COLOR col)
  *Next, we are doing some ugly type conversion, casting the address of 
  *our local variable to a byte array pointer. 
  */
-      SpiRam.write_stream(mMemAddr->l + ( id * csize ),
+      SpiRam.write_stream( (int*)mMemAddr + ( id * csize ),
                           (byte*)(&col), csize);
     }
     else
     {
-      *(mMemAddr + csize) = col;
+      *(mMemAddr + id) = col;
     }
   }
 }
