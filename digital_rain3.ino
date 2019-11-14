@@ -14,16 +14,8 @@
 #include "CONFIG.h"
 #include "rain.h"  //The digital rain algorithm
 
-#include <Adafruit_NeoPixel.h>  //Someone else did the heavy lifting.  Say thanks!
-#ifdef __AVR__
-  #include <avr/power.h>
-#endif
-
 //TODO protect globals in V3.
 //Global variables
-/*Handle to the LED array. We will use this to apply the values to the pixels in the array.*/
-Adafruit_NeoPixel H_LEDS = Adafruit_NeoPixel(CONFIG::NUM_LEDS, CONFIG::PIN_LED, NEO_GRB + NEO_KHZ800);
-
 Rain rain;           //Container class for rain algorithm.  See rain.h for details
 
 void setup() {       //Builtin function run once at start of app.
@@ -36,7 +28,7 @@ void setup() {       //Builtin function run once at start of app.
 
 void loop() { //Builtin function.
   rain.loopStep();
-  display_pix();
+  CONFIG::pix.display();
   //TODO:
   /*
    * This delay is hard-coded and we have to recompile and re-upload any time
@@ -53,13 +45,14 @@ void loop() { //Builtin function.
  * patterns or scaling, mirroring, compressing and otherwise distorting part of a 
  * pattern and projecting it across the array.
  */
+ 
 void display_pix()
 {
   for (int i=0;i<CONFIG::NUM_LEDS;++i)
   {
     COLOR c;
     c = CONFIG::pix.get(i);
-    H_LEDS.setPixelColor( ( (CONFIG::NUM_LEDS - i) - 1), H_LEDS.Color(c.c[0], c.c[1], c.c[2]));
+    CONFIG::H_LEDS.setPixelColor( ( (CONFIG::NUM_LEDS - i) - 1), CONFIG::H_LEDS.Color(c.c[0], c.c[1], c.c[2]));
   }
-  H_LEDS.show();
+  CONFIG::H_LEDS.show();
 }

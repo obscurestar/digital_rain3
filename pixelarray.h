@@ -20,22 +20,28 @@ class PixelArray
 private:
   int mNumPix;  //Number of pixels in array
   bool mUseSPI; //Set true if using SPI memory to hold our array.
+  bool mUseUpdateFlags; //If true, store changes to limit writing to pix array.
   COLOR* mMemAddr; //Base address in SPI memory where our array is held.
+  int*  mUFAddr;  //Base address for update flags array.
 public:
   PixelArray(int num_pix, bool use_spi_mem );
   void set(int id, COLOR color);
   void set(int id, int col, byte val);
   void set(int id, byte r, byte g, byte b);
   COLOR get(int id);
+  void flushFlags();
+  byte getFlags(int id);
+  void display();
 private:
   COLOR* memAlloc( int num_pix );
   COLOR* spiAlloc( int num_pix );
 };
 
+
 COLOR* PixelArray::memAlloc( int num_pix )
 {
   COLOR* ret = NULL;
-  /*TODO 26 is terrible constant and this is a bad place for it.
+  /*TODO 256 is terrible constant and this is a bad place for it.
    * None the less, I want to do a bare first pass and not overflowing
    * memory here.  I know COLOR is4 bytes and 256x4=1024 or half the 
    * available memory so let's limit to that for now.  We can tune this
@@ -66,17 +72,39 @@ PixelArray::PixelArray(int num_pix, bool use_spi_mem)
    */
    if (mUseSPI)
    {
-      mMemAddr = spiAlloc( mNumPix );
+      mMemAddr = spiAlloc( sizeof(COLOR) * mNumPix );
+      if (mUseUpdateFlags)
+      {
+        /*Unlike the overloading of mMemAddr, a dubious 'optimization' that may
+         * bite us in the future, this is a real optimization.  the bool type 
+         * is actually stored as an int internally.  2 bytes for every bit.
+         * What we'll do instead is create a bit-to-bit mapping using divide
+         * and modulo to address our mask flags.
+         * We'll start that process here by allocating the memory.  Ceil is 
+         * divide and round up.  So 7/8=1, 8/8=1, 9/8=2 etc 
+         */
+        mUFAddr = (int *)spiMem::spi_alloc( ceil(mNumPix/8) );
+      }
    }
    else
    {
-      mMemAddr = memAlloc (mNumPix);
+      mMemAddr = memAlloc (sizeof(COLOR) * mNumPix);
+      if (mUseUpdateFlags)
+      {
+        mUFAddr = (signed int *)malloc( ceil(mNumPix/8) ); //See above comment.
+      }
    }
    if (!mMemAddr) //Allocation failed
    {
       Serial.println("!malloc");
       //??? what are we going to do for error handling?
       //TODO decide allocate fail behavior and fail behavior in general. 
+   }
+   if (!mUFAddr) //Allocation failed
+   {
+      //This isnt' fatal, it will just make our updates slow.
+      //TODO warn the developer the allocation failed.
+      mUseUpdateFlags = false;  //If no memory addr, don't use.
    }
 }
 
@@ -102,6 +130,24 @@ void PixelArray::set(int id, COLOR col)
  */
       SpiRam.write_stream( (int*)mMemAddr + ( id * csize ),
                           (byte*)(&col), csize);
+      if (mUseUpdateFlags)
+      {
+        int idx1, idx2;
+        idx1 = id/8;
+        idx2 = id%8;
+        char flags;
+        //Read bitmask for 8 sequential pixels
+        SpiRam.read_stream(*mUFAddr + idx1, flags, 1);
+        /*Take a 1, shift it over the modulo bits, logically OR it with 
+         * the bitmask, and write it back out.  
+         * Say we are changing pixel 3.  Because idx1 is an int, 
+         * 3/8=0 so we'll be getting the 0th block, pixels 0-7
+         * We'll then take 1 and shift it 3 places to binary 1000
+         * Logical OR (|) basically gives you all the 1s from 2 byte arrays.
+         * IE 10101010 | 01010101 = 11111111; 11101111 | 10101010 = 11101111
+         */
+        SpiRam.write_stream(*mUFAddr + idx1, (flags | (1<<idx2)), 1 );
+      }
     }
     else
     {
@@ -143,5 +189,66 @@ COLOR PixelArray::get(int id)
     }
   }
   return col;
+}
+
+void PixelArray::flushFlags()
+{
+  if (mUseUpdateFlags)
+  {
+    int sz = ceil(mNumPix/8);
+    if (mUseSPI)
+    {
+      for (int i=0;i<sz;++i)
+      {
+        SpiRam.write_stream(*mUFAddr + i, 0, 1);
+      }
+    }
+    else
+    {
+      memset(mUFAddr, 0, sz);
+    }
+  }
+}
+
+byte PixelArray::getFlags(int id)
+{
+  byte flags = 0xFF; //Return true if not using updateflags.
+  if (mUseUpdateFlags)
+  {
+    int idx1, idx2;
+    idx1 = id/8;
+    idx2 = id%8;
+    //Read bitmask for 8 sequential pixels
+    SpiRam.read_stream(*mUFAddr + idx1, flags, 1);
+  }
+  return flags;
+}
+
+void PixelArray::display()
+{
+  int idx2;
+  byte flags;
+  bool set=true;
+  int count=0;
+  
+  for (int i=0;i<mNumPix;++i)
+  {
+    idx2 = i%8; 
+    if ( idx2 == 0 )  //No remainder, fetch new flags.
+    {
+      flags = getFlags(i);
+    }
+    if (flags & (1<<idx2))
+    {
+      COLOR c;
+      c = get(i);
+      CONFIG::H_LEDS.setPixelColor( ( (mNumPix - i) - 1), CONFIG::H_LEDS.Color(c.c[0], c.c[1], c.c[2]));
+      count++; //Temporary debugging variable.  TODO remove me!
+    }
+  }
+    char buff[50];
+    sprintf(buff, "Wrote %d of %d\n", count, mNumPix);
+    Serial.print(buff);
+  CONFIG::H_LEDS.show();
 }
 #endif //PIXELARRAY_H
