@@ -48,7 +48,7 @@ namespace CONFIG
   /*SPI RAM Also uses the pins 11, 12, and 13 on the arduino*/
   const short PIN_SPIRAM = 10;  //The data pin for talking to extended memory module.
   const short PIN_LED = 6;  //Pin connecting the IN on the LED strip to the CPU board.
-  const short NUM_LEDS = 16; //Num LEDS in our array.
+  const short NUM_LEDS = 256; //Num LEDS in our array.
 
   //Global Variables
   byte MAX_BRITE=255;  //The brightest we want our display to get. 

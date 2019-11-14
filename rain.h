@@ -88,6 +88,9 @@ byte Rain::walkPixels()
   mDirty=false;
   for (int p=0;p<CONFIG::NUM_LEDS; ++p)  //Loop through pixels.
   {
+    COLOR col = CONFIG::pix.get(p);
+    long ocol = col.l;
+    
     for (int c=0;c<3;++c)     //Loop through RBG sub-pixels of each pixel.
     {
       /*in pickHueMask we set mHueMask to the subset of LEDs in a pixel we want to touch
@@ -110,15 +113,15 @@ byte Rain::walkPixels()
            * so we use the extra space of the signed integer to absorb this, then range check
            * and only adopt valid range values. 
            */
-          signed int val = CONFIG::pix.get(p).c[c] + (random(3) - 1); // rand result set [0,1,2] - 1 = [-1, 0, 1]
+          signed int val = col.c[c] + (random(3) - 1); // rand result set [0,1,2] - 1 = [-1, 0, 1]
           if (val > 0 && val < 255)
           {
-            CONFIG::pix.set(p,c,val);  //Stagger around in the relative color space.
+            col.c[c] = val;  //Stagger around in the relative color space.
           }
       }
       else
       {                       //Stagger towards 0, let iterator know this one doesn't count. 
-        if (CONFIG::pix.get(p).c[c] > 0) //This RGB should not be set in this hue. Still draining previous color
+        if (col.c[c] > 0) //This RGB should not be set in this hue. Still draining previous color
         {
           mDirty=true;  //Indicates some pixels of the skipped hue are still set. 
           /*Initially I had simply pix.get(p).c[c] -= random(2); (50/50 chance of darkening) 
@@ -132,14 +135,16 @@ byte Rain::walkPixels()
              * that we're doing a lot of math directly on elements, we might
              * consider writing some operator overloads to handle this.
              */
-            COLOR col = CONFIG::pix.get(p); //Get value
             col.c[c] --;                    //Subtract
-            CONFIG::pix.set(p, col);        //Write
           }
         }
       }
+    } //End RGB iteration of this pixel
+    if (col.l != ocol )  //Only write pixel to mem if actually changed. 
+    {
+      CONFIG::pix.set(p,col);
     }
-  }
+  } //End loop through arrays.
   return mDirty;
 }
 
