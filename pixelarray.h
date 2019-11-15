@@ -33,7 +33,6 @@ public:
   void flushFlags();
   void flag(int id);
   byte getFlags(int id);
-  void display();
 private:
   COLOR* memAlloc( int num_pix );
   COLOR* spiAlloc( int num_pix );
@@ -257,29 +256,4 @@ byte PixelArray::getFlags(int id)
   return flags;
 }
 
-void PixelArray::display()
-{
-  int idx2;
-  byte flags;
-  bool set=true;
-  int count=0;
-  
-  for (int i=0;i<mNumPix;++i)
-  {
-    idx2 = i%8; 
-    if ( idx2 == 0 )  //No remainder, fetch new flags.
-    {
-      flags = getFlags(i);
-    }
-    if (flags & (1<<idx2))
-    {
-      COLOR c;
-      c = get(i);
-      CONFIG::H_LEDS.setPixelColor( ( (mNumPix - i) - 1), CONFIG::H_LEDS.Color(c.c[0], c.c[1], c.c[2]));
-      count++; //Temporary debugging variable.  TODO remove me!
-    }
-  }
-  CONFIG::H_LEDS.show();
-  flushFlags();
-}
 #endif //PIXELARRAY_H

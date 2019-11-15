@@ -26,7 +26,7 @@ private:  //class private variables
 };
 
 Rain::Rain() : mDirty(false),
-               mShiftOdds(100)  //TODO: Setting arbitrary inline const is ugly
+               mShiftOdds(200)  //TODO: Setting arbitrary inline const is ugly
 {
   mHueMask = pickHueMask();
 }
@@ -75,7 +75,7 @@ byte Rain::pickHueMask()
     * color generated above is 110 (cyan)
     */
 
-  if (!random(10))  //If 0, invert the bitmask.
+  if (!random(5))  //If 0, invert the bitmask.
   {
     cbits = ~cbits;  // ~ is the complimentary operator 010 becomes 101 etc
   }
@@ -128,7 +128,7 @@ byte Rain::walkPixels()
            * but decided this moved to 0 too quickly and played around to find a chance 
            * to descend that was more visually appealing to me. 
            */
-          if (!random(3))
+          if (!random(5))
           {
             /*TODO: This is a bit uglier than our previous interface of 
              * simply -- Let's leave this for the moment.  If we find later

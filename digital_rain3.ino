@@ -13,22 +13,22 @@
 
 #include "CONFIG.h"
 #include "rain.h"  //The digital rain algorithm
+#include "litepixel.h"
 
 //TODO protect globals in V3.
 //Global variables
 Rain rain;           //Container class for rain algorithm.  See rain.h for details
+LitePixel lite;
 
 void setup() {       //Builtin function run once at start of app.
   Serial.begin(9600); //Open serial(Com speed) Useful for debug but watch string memory use.
 
-  //strip.setBrightness(BRIGHTNESS);  //TODO experiment with this feature.
-  H_LEDS.begin(); //Initialize communication with WS281* chain.
-  H_LEDS.show(); //No values are set so this should be black.
+  lite.setup(); //Initialize communication with WS281* chain.
 }
 
 void loop() { //Builtin function.
   rain.loopStep();
-  CONFIG::pix.display();
+  display_pix();
   //TODO:
   /*
    * This delay is hard-coded and we have to recompile and re-upload any time
@@ -48,11 +48,13 @@ void loop() { //Builtin function.
  
 void display_pix()
 {
+  cli();
   for (int i=0;i<CONFIG::NUM_LEDS;++i)
   {
     COLOR c;
     c = CONFIG::pix.get(i);
-    CONFIG::H_LEDS.setPixelColor( ( (CONFIG::NUM_LEDS - i) - 1), CONFIG::H_LEDS.Color(c.c[0], c.c[1], c.c[2]));
+    lite.sendPixel( c.c[0], c.c[1], c.c[2]);
   }
-  CONFIG::H_LEDS.show();
+  sei();
+  lite.show();
 }

@@ -4,11 +4,6 @@
  * For now, we'll constrain them to a file and include them everywhere.  I 
  */
 
- 
-#include <Adafruit_NeoPixel.h>  //Someone else did the heavy lifting.  Say thanks!
-#ifdef __AVR__
-  #include <avr/power.h>
-#endif
 
 #ifndef CONFIG_H  
 #define CONFIG_H  
@@ -49,32 +44,27 @@
 
 #include "color.h"  //Our color datatype.
 #include "pixelarray.h" 
+
 namespace CONFIG 
 {
   //Hardware constants
   /*SPI RAM Also uses the pins 11, 12, and 13 on the arduino*/
   const short PIN_SPIRAM = 10;  //The data pin for talking to extended memory module.
   const short PIN_LED = 6;  //Pin connecting the IN on the LED strip to the CPU board.
-  const short NUM_LEDS = 450; //Num LEDS in our array.
+  const short NUM_LEDS = 388; //Num LEDS in our array.
   
-  /*Handle to the LED array. We will use this to apply the values to the pixels in the array.*/
-  Adafruit_NeoPixel H_LEDS = Adafruit_NeoPixel(CONFIG::NUM_LEDS, CONFIG::PIN_LED, NEO_GRB + NEO_KHZ800);
-
   //Global Variables
   byte MAX_BRITE=255;  //The brightest we want our display to get. 
 
- 
-  PixelArray pix(NUM_LEDS, 1, 1, 0); //Either pointer to buffer  or offset for spiram.
+  PixelArray pix(NUM_LEDS, 1, 0, 0); //Either pointer to buffer  or offset for spiram.
 };
 
 #else  //CONFIG_H 
 
 namespace CONFIG
 {
-  extern const short NUM_LEDS; 
-  extern Adafruit_NeoPixel H_LEDS;
-
-//  extern PixelArray pix;  //Ditto!
+  extern const short NUM_LEDS;
+  extern const short PIN_LED;
 };
 
 #endif //CONFIG_H
