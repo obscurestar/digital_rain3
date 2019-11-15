@@ -55,7 +55,7 @@ namespace CONFIG
   /*SPI RAM Also uses the pins 11, 12, and 13 on the arduino*/
   const short PIN_SPIRAM = 10;  //The data pin for talking to extended memory module.
   const short PIN_LED = 6;  //Pin connecting the IN on the LED strip to the CPU board.
-  const short NUM_LEDS = 256; //Num LEDS in our array.
+  const short NUM_LEDS = 450; //Num LEDS in our array.
   
   /*Handle to the LED array. We will use this to apply the values to the pixels in the array.*/
   Adafruit_NeoPixel H_LEDS = Adafruit_NeoPixel(CONFIG::NUM_LEDS, CONFIG::PIN_LED, NEO_GRB + NEO_KHZ800);
@@ -64,7 +64,7 @@ namespace CONFIG
   byte MAX_BRITE=255;  //The brightest we want our display to get. 
 
  
-  PixelArray pix(NUM_LEDS, 1); //Either pointer to buffer  or offset for spiram.
+  PixelArray pix(NUM_LEDS, 1, 1, 0); //Either pointer to buffer  or offset for spiram.
 };
 
 #else  //CONFIG_H 

@@ -21,15 +21,17 @@ private:
   int mNumPix;  //Number of pixels in array
   bool mUseSPI; //Set true if using SPI memory to hold our array.
   bool mUseUpdateFlags; //If true, store changes to limit writing to pix array.
-  COLOR* mMemAddr; //Base address in SPI memory where our array is held.
+  bool mUseSPIFlags; //True to use SPI mem for flags.
+  COLOR* mMemAddr; //Base address in memory where our array is held.
   int*  mUFAddr;  //Base address for update flags array.
 public:
-  PixelArray(int num_pix, bool use_spi_mem );
+  PixelArray(int num_pix, bool use_spi_mem, bool use_update_flags, bool use_spi_flags );
   void set(int id, COLOR color);
   void set(int id, int col, byte val);
   void set(int id, byte r, byte g, byte b);
   COLOR get(int id);
   void flushFlags();
+  void flag(int id);
   byte getFlags(int id);
   void display();
 private:
@@ -60,9 +62,11 @@ COLOR* PixelArray::spiAlloc( int num_pix )
   return (COLOR*)spiMem::spi_alloc( sizeof(COLOR) * num_pix );
 }
 
-PixelArray::PixelArray(int num_pix, bool use_spi_mem)
+PixelArray::PixelArray(int num_pix, bool use_spi_mem, bool use_update_flags, bool use_spi_flags)
 {
   mNumPix = num_pix;
+  mUseUpdateFlags = use_update_flags;
+  mUseSPIFlags = use_spi_flags;
   mUseSPI = use_spi_mem;
   /*TODO:  Right now we have nothing else in memory on our SPI RAM chip so 
    * we're just going to set our base address to 0.   This means we're doing 
@@ -73,87 +77,115 @@ PixelArray::PixelArray(int num_pix, bool use_spi_mem)
    if (mUseSPI)
    {
       mMemAddr = spiAlloc( sizeof(COLOR) * mNumPix );
-      if (mUseUpdateFlags)
-      {
-        /*Unlike the overloading of mMemAddr, a dubious 'optimization' that may
-         * bite us in the future, this is a real optimization.  the bool type 
-         * is actually stored as an int internally.  2 bytes for every bit.
-         * What we'll do instead is create a bit-to-bit mapping using divide
-         * and modulo to address our mask flags.
-         * We'll start that process here by allocating the memory.  Ceil is 
-         * divide and round up.  So 7/8=1, 8/8=1, 9/8=2 etc 
-         */
-        mUFAddr = (int *)spiMem::spi_alloc( ceil(mNumPix/8) );
-      }
    }
    else
    {
       mMemAddr = memAlloc (sizeof(COLOR) * mNumPix);
-      if (mUseUpdateFlags)
-      {
-        mUFAddr = (signed int *)malloc( ceil(mNumPix/8) ); //See above comment.
-      }
    }
    if (!mMemAddr) //Allocation failed
    {
-      Serial.println("!malloc");
       //??? what are we going to do for error handling?
       //TODO decide allocate fail behavior and fail behavior in general. 
    }
-   if (!mUFAddr) //Allocation failed
-   {
-      //This isnt' fatal, it will just make our updates slow.
-      //TODO warn the developer the allocation failed.
-      mUseUpdateFlags = false;  //If no memory addr, don't use.
-   }
+
+  if (mUseUpdateFlags)
+  {
+    if (mUseSPIFlags)
+    {
+     /*The bool type 
+      * is actually stored as an int internally.  2 bytes for every bit.
+      * What we'll do instead is create a bit-to-bit mapping using divide
+      * and modulo to address our mask flags.
+      * We'll start that process here by allocating the memory.  Ceil is 
+      * divide and round up.  So 7/8=1, 8/8=1, 9/8=2 etc 
+      */
+      mUFAddr = spiMem::spi_alloc( ceil(mNumPix/8) );
+    }
+    else
+    {
+      mUFAddr = (int *)malloc( ceil(mNumPix/8) ); //See above comment.
+    }
+    if (!mUFAddr) //Allocation failed
+    {
+       //This isnt' fatal, it will just make our updates slow.
+       //TODO warn the developer the allocation failed.
+       mUseUpdateFlags = false;  //If no memory addr, don't use.
+    }
+  }
+}
+
+void PixelArray::flag(int id)
+{
+  static int oidx=0xFFFF;
+  static byte flags;
+  if (mUseUpdateFlags)
+  {
+    int idx1, idx2;
+    idx1 = id/8;
+    idx2 = id%8;
+
+    if (idx1 != oidx)
+    {
+      if (mUseSPIFlags)
+      {
+        if (oidx!=0xFFFF)
+        {
+          SpiRam.write_stream(*mUFAddr + oidx, &flags, 1 );
+        }
+        //Read bitmask for 8 sequential pixels
+        SpiRam.read_stream(*mUFAddr + idx1, flags, 1);
+      }
+      else
+      {
+        if (oidx!=0xFFFF)
+        {
+           mUFAddr[oidx] = flags;
+        }
+        flags=mUFAddr[idx1];
+      }
+
+      oidx = idx1;
+
+      /*Take a 1, shift it over the modulo bits, logically OR it with 
+       * the bitmask, and write it back out.  
+       * Say we are changing pixel 3.  Because idx1 is an int, 
+       * 3/8=0 so we'll be getting the 0th block, pixels 0-7
+       * We'll then take 1 and shift it 3 places to binary 1000
+       * Logical OR (|) basically gives you all the 1s from 2 byte arrays.
+       * IE 10101010 | 01010101 = 11111111; 11101111 | 10101010 = 11101111
+       */
+      flags = flags | (1<<idx2);
+    }
+  }
 }
 
 void PixelArray::set(int id, COLOR col)
 {
   int csize = sizeof(COLOR);
-  if (mMemAddr)
+
+  if (mUseSPI)
   {
-    if (mUseSPI)
-    {
 /*In C++ you can do ANYTHING you want.  With this great power should come
- * great responsibility, but sometimes you are going to see code that looks 
- * like this.  Power blatantly abused for reasons of dubious value.  
- *
- *Data is data.  We're casting our *COLOR memory address to an integer. 
- *NOTE: using int rather than short is least-fragile here.  If we went to a 
- *system where int is defined as long, this awful conversion still works. 
- *So, we're getting the number we stashed there as an index into spi mem
- *and adding to it the byte offset of the pixel ID times the sizeof our 
- *color data.
- *Next, we are doing some ugly type conversion, casting the address of 
- *our local variable to a byte array pointer. 
- */
+* great responsibility, but sometimes you are going to see code that looks 
+* like this.  Power blatantly abused for reasons of dubious value.  
+*
+*Data is data.  We're casting our *COLOR memory address to an integer. 
+*NOTE: using int rather than short is least-fragile here.  If we went to a 
+*system where int is defined as long, this awful conversion still works. 
+*So, we're getting the number we stashed there as an index into spi mem
+*and adding to it the byte offset of the pixel ID times the sizeof our 
+*color data.
+*Next, we are doing some ugly type conversion, casting the address of 
+*our local variable to a byte array pointer. 
+*/
       SpiRam.write_stream( (int*)mMemAddr + ( id * csize ),
                           (byte*)(&col), csize);
-      if (mUseUpdateFlags)
-      {
-        int idx1, idx2;
-        idx1 = id/8;
-        idx2 = id%8;
-        char flags;
-        //Read bitmask for 8 sequential pixels
-        SpiRam.read_stream(*mUFAddr + idx1, flags, 1);
-        /*Take a 1, shift it over the modulo bits, logically OR it with 
-         * the bitmask, and write it back out.  
-         * Say we are changing pixel 3.  Because idx1 is an int, 
-         * 3/8=0 so we'll be getting the 0th block, pixels 0-7
-         * We'll then take 1 and shift it 3 places to binary 1000
-         * Logical OR (|) basically gives you all the 1s from 2 byte arrays.
-         * IE 10101010 | 01010101 = 11111111; 11101111 | 10101010 = 11101111
-         */
-        SpiRam.write_stream(*mUFAddr + idx1, (flags | (1<<idx2)), 1 );
-      }
-    }
-    else
-    {
-      *(mMemAddr + id) = col;
-    }
   }
+  else
+  {
+      *(mMemAddr + id) = col;
+  }
+  flag(id);
 }
 
 void PixelArray::set(int id, int col, byte val)
@@ -213,6 +245,7 @@ void PixelArray::flushFlags()
 byte PixelArray::getFlags(int id)
 {
   byte flags = 0xFF; //Return true if not using updateflags.
+
   if (mUseUpdateFlags)
   {
     int idx1, idx2;
@@ -246,9 +279,7 @@ void PixelArray::display()
       count++; //Temporary debugging variable.  TODO remove me!
     }
   }
-    char buff[50];
-    sprintf(buff, "Wrote %d of %d\n", count, mNumPix);
-    Serial.print(buff);
   CONFIG::H_LEDS.show();
+  flushFlags();
 }
 #endif //PIXELARRAY_H
